@@ -1,0 +1,12 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# .NET Build
+**/bin/
+**/obj/
+
+# IDE
+.vscode/
+.idea/
