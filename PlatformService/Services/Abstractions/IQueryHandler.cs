@@ -1,6 +1,8 @@
 namespace PlatformService.Services.Abstractions
 {
-    public interface IQueryHandler<TQuery, TResult> where TQuery : IQuery<TResult>
+    public interface IQueryHandler<TQuery, TResponse>
+        : IRequestHandler<TQuery, TResponse>
+        where TQuery : IQuery<TResponse>
     {
     }
 }

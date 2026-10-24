@@ -1,6 +1,7 @@
 using PlatformService.Contracts;
 using PlatformService.Data.Repos;
 using PlatformService.Services.Abstractions;
+using PlatformService.Shared;
 
 namespace PlatformService.Services.Queries
 {
@@ -13,20 +14,26 @@ namespace PlatformService.Services.Queries
             _platformRepo = platformRepo;
         }
 
-        public async Task<IEnumerable<PlatformReadResponse>> HandleAsync(GetPlatformServicesQuery query, CancellationToken cancellationToken)
+        public async Task<Result<IEnumerable<PlatformReadResponse>>> HandleAsync(GetPlatformServicesQuery query, CancellationToken cancellationToken)
         {
             var platforms = await _platformRepo.GetAllPlatformsAsync();
 
             if (platforms is null)
-                return [];
-                
-            return [.. platforms.Select(p => new PlatformReadResponse
+                return Result.Failure<IEnumerable<PlatformReadResponse>>(
+                    new Error(
+                        "Platforms.Empty",
+                        "There are no platforms available."));
+
+            var platformResponse = platforms.Select(p => new PlatformReadResponse
             (
                 Id: p.Id,
                 Name: p.Name,
                 Publisher: p.Publisher,
                 Cost: p.Cost
-            ))];
+            )).ToList();
+
+
+            return platformResponse;
         }
     }
 }

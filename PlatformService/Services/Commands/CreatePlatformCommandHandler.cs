@@ -1,6 +1,7 @@
-using PlatformService.Services.Abstractions;
 using PlatformService.Data.Repos;
 using PlatformService.Models;
+using PlatformService.Services.Abstractions;
+using PlatformService.Shared;
 namespace PlatformService.Services.Commands
 {
     public class CreatePlatformCommandHandler : ICommandHandler<CreatePlatformCommand, int>
@@ -11,7 +12,7 @@ namespace PlatformService.Services.Commands
         {
             _platformRepo = platformRepo;
         }
-        public async Task<int> HandleAsync(CreatePlatformCommand command, CancellationToken cancellationToken = default)
+        public async Task<Result<int>> HandleAsync(CreatePlatformCommand command, CancellationToken cancellationToken = default)
         {
             var platform = new Platform
             {
@@ -24,8 +25,8 @@ namespace PlatformService.Services.Commands
 
             if (platform.Id == 0)
                 throw new Exception("Failed to create platform.");
-                
-            return platform.Id;
+
+            return Result.Success(platform.Id);
         }
     }
 }

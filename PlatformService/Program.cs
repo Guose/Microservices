@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PlatformService.Contracts;
 using PlatformService.Data;
@@ -7,7 +8,6 @@ using PlatformService.Services.Abstractions;
 using PlatformService.Services.Commands;
 using PlatformService.Services.Dispatchers;
 using PlatformService.Services.Queries;
-using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,9 +16,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 
 builder.Services.AddScoped<IPlatformRepo, PlatformRepo>();
-builder.Services.AddScoped<ICommandDispatcher, CommandDispatcher>();
-builder.Services.AddScoped<IQueryDispatcher, QueryDispatcher>();
-builder.Services.AddScoped<IQueryHandler<GetPlatformServicesQuery, IEnumerable<PlatformReadResponse>>, GetPlatformServicesQueryHandler>();
+builder.Services.AddScoped<IDispatcher, Dispatcher>();
+
+builder.Services.AddScoped<
+    IRequestHandler<GetPlatformServicesQuery, IEnumerable<PlatformReadResponse>>,
+    GetPlatformServicesQueryHandler>();
+
+builder.Services.AddScoped<
+    IRequestHandler<CreatePlatformCommand, int>,
+    CreatePlatformCommandHandler>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseInMemoryDatabase("InMemoryDb"));
@@ -35,36 +41,37 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/platform-services", async (
-    IQueryDispatcher queryDispatcher, CancellationToken cancellationToken) =>
+    IDispatcher queryDispatcher, CancellationToken cancellationToken) =>
 {
     var query = new GetPlatformServicesQuery();
-    var result = await queryDispatcher
-        .SendAsync<GetPlatformServicesQuery, IEnumerable<PlatformReadResponse>>(
-            new GetPlatformServicesQuery(), cancellationToken);
+    var result = await queryDispatcher.SendAsync(query, cancellationToken);
 
-    return Results.Ok(result);
+    return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result.Value);
 
 }).ProducesProblem(StatusCodes.Status500InternalServerError)
-  .Produces<IEnumerable<PlatformReadResponse>>(StatusCodes.Status200OK); 
+.ProducesProblem(StatusCodes.Status400BadRequest)
+.Produces<IEnumerable<PlatformReadResponse>>(StatusCodes.Status200OK);
 
-app.MapPost("/platform", async (
-    ICommandDispatcher commandDispatcher,
-    [FromBody] PlatformCreateRequest request, 
+app.MapPost("/platform-service", async (
+    IDispatcher commandDispatcher,
+    [FromBody] PlatformCreateRequest request,
     CancellationToken cancellationToken) =>
 {
     var command = new CreatePlatformCommand(
         request.Name,
         request.Publisher,
         request.Cost);
-    
-    var result = await commandDispatcher
-        .SendAsync<CreatePlatformCommand, int>(
-            command, cancellationToken);
 
-    return Results.Created($"/api/platforms/{result}", new { Id = result });
+    var result = await commandDispatcher
+        .SendAsync(command, cancellationToken);
+
+    return result.IsSuccess
+        ? Results.Created($"/api/platform/{result.Value}", new { Id = result.Value })
+        : Results.BadRequest(result.Value);
 
 }).ProducesProblem(StatusCodes.Status500InternalServerError)
-  .Produces<int>(StatusCodes.Status201Created); 
+.ProducesProblem(StatusCodes.Status400BadRequest)
+.Produces<int>(StatusCodes.Status201Created);
 
 app.UseHttpsRedirection();
 

@@ -1,10 +1,20 @@
+using PlatformService.Shared;
+
 namespace PlatformService.Services.Abstractions
 {
-    public interface IRequestHandler<TRequest, TResult>
-        where TRequest : IRequest<TResult>
+    public interface IRequestHandler<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>
     {
-        Task<TResult> HandleAsync(
-            TRequest request, 
+        Task<Result<TResponse>> HandleAsync(
+            TRequest request,
+            CancellationToken cancellationToken);
+    }
+
+    public interface IRequestHandler<TRequest>
+        where TRequest : IRequest<Result>
+    {
+        Task<Result> HandleAsync(
+            TRequest request,
             CancellationToken cancellationToken);
     }
 }

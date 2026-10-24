@@ -1,4 +1,4 @@
 namespace PlatformService.Services.Abstractions
 {
-    public interface IRequest<TResult> { }
+    public interface IRequest<TResponse> { }
 }
