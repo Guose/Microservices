@@ -1,4 +1,3 @@
-
 namespace CommandService
 {
     public class Program
@@ -9,7 +8,6 @@ namespace CommandService
 
             // Add services to the container.
 
-            builder.Services.AddControllers();
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 
@@ -21,12 +19,17 @@ namespace CommandService
                 app.MapOpenApi();
             }
 
-            app.UseHttpsRedirection();
+            app.MapPost("/api/commands/ping", async (
+                CancellationToken cancellationToken) =>
+            {
+                Console.WriteLine("CommandSerivce reached...");
+                return Results.Ok("Pong");
 
-            app.UseAuthorization();
+            }).ProducesProblem(StatusCodes.Status500InternalServerError)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .Produces<int>(StatusCodes.Status201Created);
 
-
-            app.MapControllers();
+            // app.UseHttpsRedirection();
 
             app.Run();
         }

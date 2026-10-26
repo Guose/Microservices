@@ -2,12 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PlatformService.Contracts;
 using PlatformService.Data;
-using PlatformService.Data.PrepInMemoryData;
+using PlatformService.Data.PrepDb;
 using PlatformService.Data.Repos;
 using PlatformService.Services.Abstractions;
 using PlatformService.Services.Commands;
 using PlatformService.Services.Dispatchers;
 using PlatformService.Services.Queries;
+using PlatformService.SyncDataServices.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,20 +19,34 @@ builder.Services.AddOpenApi();
 builder.Services.AddScoped<IPlatformRepo, PlatformRepo>();
 builder.Services.AddScoped<IDispatcher, Dispatcher>();
 
+builder.Services.AddHttpClient<ICommandDataClient, HttpCommandDataClient>();
+
+builder.Logging.AddFilter(
+    "System.Net.Http.HttpClient.ICommandDataClient",
+    LogLevel.Warning);
+
 builder.Services.AddScoped<
     IRequestHandler<GetPlatformServicesQuery, IEnumerable<PlatformReadResponse>>,
     GetPlatformServicesQueryHandler>();
 
 builder.Services.AddScoped<
-    IRequestHandler<CreatePlatformCommand, int>,
+    IRequestHandler<CreatePlatformCommand, PlatformReadResponse>,
     CreatePlatformCommandHandler>();
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseInMemoryDatabase("InMemoryDb"));
+if (builder.Environment.IsProduction())
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServiceConn")));
+}
+else
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseInMemoryDatabase("InMemoryDb"));
+}
 
 var app = builder.Build();
 
-DbSeeder.Initialize(app);
+DbSeeder.Initialize(app, builder.Environment.IsProduction());
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -41,7 +56,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/platform-services", async (
-    IDispatcher queryDispatcher, CancellationToken cancellationToken) =>
+    IDispatcher queryDispatcher,
+    CancellationToken cancellationToken) =>
 {
     var query = new GetPlatformServicesQuery();
     var result = await queryDispatcher.SendAsync(query, cancellationToken);
@@ -66,13 +82,15 @@ app.MapPost("/platform-service", async (
         .SendAsync(command, cancellationToken);
 
     return result.IsSuccess
-        ? Results.Created($"/api/platform/{result.Value}", new { Id = result.Value })
-        : Results.BadRequest(result.Value);
+        ? Results.Created((string?)null, result.Value)
+        : Results.Problem(
+            detail: result.Error?.Message,
+            statusCode: result.Error?.Code == "Service.Unavailable"
+                ? StatusCodes.Status503ServiceUnavailable
+                : StatusCodes.Status400BadRequest);
 
 }).ProducesProblem(StatusCodes.Status500InternalServerError)
 .ProducesProblem(StatusCodes.Status400BadRequest)
-.Produces<int>(StatusCodes.Status201Created);
-
-app.UseHttpsRedirection();
+.Produces<PlatformReadResponse>(StatusCodes.Status201Created);
 
 app.Run();

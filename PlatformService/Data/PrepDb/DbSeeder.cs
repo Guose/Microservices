@@ -1,17 +1,31 @@
+using Microsoft.EntityFrameworkCore;
 using PlatformService.Models;
 
-namespace PlatformService.Data.PrepInMemoryData
+namespace PlatformService.Data.PrepDb
 {
     public static class DbSeeder
     {
-        public static void Initialize(IApplicationBuilder app)
+        public static void Initialize(IApplicationBuilder app, bool isProd)
         {
             using var serviceScope = app.ApplicationServices.CreateScope();
             var context = serviceScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            Seed(context);
+            Seed(context, isProd);
         }
-        private static void Seed(AppDbContext context)
+        private static void Seed(AppDbContext context, bool isProd)
         {
+            if (isProd)
+            {
+                Console.WriteLine("--> Attempting to apply migrations...");
+                try
+                {
+                    context.Database.Migrate();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"--> Could not apply migrations: {ex.Message}");
+                }
+            }
+
             if (!context.Platforms.Any())
             {
                 Console.WriteLine("Seeding initial \'Platform\' data...");
