@@ -1,14 +1,15 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PlatformService.Contracts;
 using PlatformService.Data;
 using PlatformService.Data.PrepDb;
 using PlatformService.Data.Repos;
-using PlatformService.Services.Abstractions;
+using PlatformService.Endpoints;
+using PlatformService.Services.AsyncDataServices;
 using PlatformService.Services.Commands;
-using PlatformService.Services.Dispatchers;
 using PlatformService.Services.Queries;
-using PlatformService.SyncDataServices.Http;
+using PlatformService.Services.SyncDataServices.Http;
+using Shared.Abstractions;
+using Shared.Dispatchers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,7 @@ builder.Services.AddScoped<IPlatformRepo, PlatformRepo>();
 builder.Services.AddScoped<IDispatcher, Dispatcher>();
 
 builder.Services.AddHttpClient<ICommandDataClient, HttpCommandDataClient>();
+builder.Services.AddSingleton<IMessageBusClient, MessageBusClient>();
 
 builder.Logging.AddFilter(
     "System.Net.Http.HttpClient.ICommandDataClient",
@@ -55,42 +57,10 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
-app.MapGet("/platform-services", async (
-    IDispatcher queryDispatcher,
-    CancellationToken cancellationToken) =>
-{
-    var query = new GetPlatformServicesQuery();
-    var result = await queryDispatcher.SendAsync(query, cancellationToken);
+await app.Services
+    .GetRequiredService<IMessageBusClient>()
+    .InitializeAsync();
 
-    return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result.Value);
-
-}).ProducesProblem(StatusCodes.Status500InternalServerError)
-.ProducesProblem(StatusCodes.Status400BadRequest)
-.Produces<IEnumerable<PlatformReadResponse>>(StatusCodes.Status200OK);
-
-app.MapPost("/platform-service", async (
-    IDispatcher commandDispatcher,
-    [FromBody] PlatformCreateRequest request,
-    CancellationToken cancellationToken) =>
-{
-    var command = new CreatePlatformCommand(
-        request.Name,
-        request.Publisher,
-        request.Cost);
-
-    var result = await commandDispatcher
-        .SendAsync(command, cancellationToken);
-
-    return result.IsSuccess
-        ? Results.Created((string?)null, result.Value)
-        : Results.Problem(
-            detail: result.Error?.Message,
-            statusCode: result.Error?.Code == "Service.Unavailable"
-                ? StatusCodes.Status503ServiceUnavailable
-                : StatusCodes.Status400BadRequest);
-
-}).ProducesProblem(StatusCodes.Status500InternalServerError)
-.ProducesProblem(StatusCodes.Status400BadRequest)
-.Produces<PlatformReadResponse>(StatusCodes.Status201Created);
+app.MapPlatformEndpoints();
 
 app.Run();

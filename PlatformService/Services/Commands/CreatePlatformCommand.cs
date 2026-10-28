@@ -1,5 +1,5 @@
 using PlatformService.Contracts;
-using PlatformService.Services.Abstractions;
+using Shared.Abstractions;
 
 namespace PlatformService.Services.Commands
 {

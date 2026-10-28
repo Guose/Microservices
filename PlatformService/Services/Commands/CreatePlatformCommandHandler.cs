@@ -1,20 +1,28 @@
 using PlatformService.Contracts;
 using PlatformService.Data.Repos;
 using PlatformService.Models;
-using PlatformService.Services.Abstractions;
-using PlatformService.Shared;
-using PlatformService.SyncDataServices.Http;
+using PlatformService.Services.AsyncDataServices;
+using PlatformService.Services.SyncDataServices.Http;
+using Shared.Abstractions;
+using Shared.Models;
+using Shared.Results;
+
 namespace PlatformService.Services.Commands
 {
     public class CreatePlatformCommandHandler : ICommandHandler<CreatePlatformCommand, PlatformReadResponse>
     {
         private readonly IPlatformRepo _platformRepo;
         private readonly ICommandDataClient _commandDataClient;
+        private readonly IMessageBusClient _messageBusClient;
 
-        public CreatePlatformCommandHandler(IPlatformRepo platformRepo, ICommandDataClient commandDataClient)
+        public CreatePlatformCommandHandler(
+            IPlatformRepo platformRepo,
+            ICommandDataClient commandDataClient,
+            IMessageBusClient messageBusClient)
         {
             _platformRepo = platformRepo;
             _commandDataClient = commandDataClient;
+            _messageBusClient = messageBusClient;
         }
         public async Task<Result<PlatformReadResponse>> HandleAsync(CreatePlatformCommand command, CancellationToken cancellationToken = default)
         {
@@ -44,8 +52,27 @@ namespace PlatformService.Services.Commands
                     (Error.ServiceUnavailable("Failed to send platform data to command service."));
             }
 
+            try
+            {
+                var publishMessage = new PlatformPublishedDto
+                (
+                    platform.Id,
+                    platform.Name,
+                    "Platform_Published"
+                );
+
+                await _messageBusClient.PublishNewPlatformAsync(publishMessage);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"--> Could not send asynchronously: {ex.Message}");
+                return Result.Failure<PlatformReadResponse>
+                    (Error.ServiceUnavailable("Failed to send platform message to message bus."));
+            }
+
             if (platform.Id == 0)
-                throw new Exception("Failed to create platform.");
+                return Result.Failure<PlatformReadResponse>
+                    (Error.ServiceUnavailable("Failed to create platform."));
 
             return Result.Success(response);
         }

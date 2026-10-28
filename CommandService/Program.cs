@@ -1,3 +1,16 @@
+using CommandService.Contracts;
+using CommandService.Data;
+using CommandService.Data.Repos;
+using CommandService.Endpoints;
+using CommandService.Events;
+using CommandService.Services.Commands;
+using CommandService.Services.Queries.GetCommands;
+using CommandService.Services.Queries.GetPlatforms;
+using CommandService.Services.Subscriber;
+using Microsoft.EntityFrameworkCore;
+using Shared.Abstractions;
+using Shared.Dispatchers;
+
 namespace CommandService
 {
     public class Program
@@ -7,6 +20,31 @@ namespace CommandService
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
+            builder.Services.AddScoped<ICommandRepo, CommandRepo>();
+            builder.Services.AddScoped<IDispatcher, Dispatcher>();
+
+            builder.Services.AddDbContext<AppDbContext>(options =>
+                options.UseInMemoryDatabase("InMemoryDb"));
+
+            builder.Services.AddHostedService<MessageBusSubscriber>();
+
+            builder.Services.AddSingleton<IEventProcessor, EventProcessor>();
+
+            builder.Services.AddScoped<
+                IRequestHandler<GetAllPlatformsQuery, List<PlatformReadDto>>,
+                GetAllPlatformsQueryHandler>();
+
+            builder.Services.AddScoped<
+                IRequestHandler<GetCommandByPlatformIdQuery, CommandReadDto>,
+                GetCommandByPlatformIdQueryHandler>();
+
+            builder.Services.AddScoped<
+                IRequestHandler<GetCommandsForPlatformQuery, List<CommandReadDto>>,
+                GetCommandsForPlatformQueryHandler>();
+
+            builder.Services.AddScoped<
+                IRequestHandler<CreateCommandForPlatformCommand, CommandReadDto>,
+                CreateCommandForPlatformCommandHandler>();
 
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
@@ -19,17 +57,8 @@ namespace CommandService
                 app.MapOpenApi();
             }
 
-            app.MapPost("/api/commands/ping", async (
-                CancellationToken cancellationToken) =>
-            {
-                Console.WriteLine("CommandSerivce reached...");
-                return Results.Ok("Pong");
-
-            }).ProducesProblem(StatusCodes.Status500InternalServerError)
-            .ProducesProblem(StatusCodes.Status400BadRequest)
-            .Produces<int>(StatusCodes.Status201Created);
-
-            // app.UseHttpsRedirection();
+            app.MapPlatformEndpoints();
+            app.MapCommandEndpoints();
 
             app.Run();
         }

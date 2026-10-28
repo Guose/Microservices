@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="CommandService/CommandService.csproj" />
   <Project Path="PlatformService/PlatformService.csproj" />
+  <Project Path="Shared/Shared.csproj" Id="3f1f9dca-c12b-430d-8c40-3006299d79b6" />
 </Solution>

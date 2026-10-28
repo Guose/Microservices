@@ -1,7 +1,7 @@
 using PlatformService.Contracts;
 using PlatformService.Data.Repos;
-using PlatformService.Services.Abstractions;
-using PlatformService.Shared;
+using Shared.Abstractions;
+using Shared.Results;
 
 namespace PlatformService.Services.Queries
 {
