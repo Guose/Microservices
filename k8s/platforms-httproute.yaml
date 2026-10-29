@@ -15,3 +15,10 @@ spec:
       backendRefs:
         - name: platforms-clusterip-srv
           port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/com
+      backendRefs:
+        - name: commands-clusterip-srv
+          port: 80

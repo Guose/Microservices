@@ -7,6 +7,7 @@ using PlatformService.Endpoints;
 using PlatformService.Services.AsyncDataServices;
 using PlatformService.Services.Commands;
 using PlatformService.Services.Queries;
+using PlatformService.Services.SyncDataServices.Gprc;
 using PlatformService.Services.SyncDataServices.Http;
 using Shared.Abstractions;
 using Shared.Dispatchers;
@@ -22,6 +23,8 @@ builder.Services.AddScoped<IDispatcher, Dispatcher>();
 
 builder.Services.AddHttpClient<ICommandDataClient, HttpCommandDataClient>();
 builder.Services.AddSingleton<IMessageBusClient, MessageBusClient>();
+
+builder.Services.AddGrpc();
 
 builder.Logging.AddFilter(
     "System.Net.Http.HttpClient.ICommandDataClient",
@@ -48,8 +51,6 @@ else
 
 var app = builder.Build();
 
-DbSeeder.Initialize(app, builder.Environment.IsProduction());
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -62,5 +63,14 @@ await app.Services
     .InitializeAsync();
 
 app.MapPlatformEndpoints();
+
+app.MapGrpcService<GrpcPlatformService>();
+
+app.MapGet("/protos/platforms.proto", async context =>
+{
+    await context.Response.WriteAsync(File.ReadAllText("Protos/platforms.proto"));
+});
+
+DbSeeder.Initialize(app, builder.Environment.IsProduction());
 
 app.Run();
